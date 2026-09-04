@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #05070a;
+}
+
+::selection {
+  background-color: #2563eb;
+  color: #f5f7fa;
+}
+
+.zenthra-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.zenthra-scroll::-webkit-scrollbar-thumb {
+  background-color: #202731;
+  border-radius: 4px;
+}

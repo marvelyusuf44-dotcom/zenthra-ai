@@ -1,0 +1,23 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+*.db
+*.sqlite
+/data/*.db
+.DS_Store
+npm-debug.log*
+
+# User-submitted payment proof files (financial/PII documents) — never
+# committed. Stored outside public/ so they are never web-servable as
+# static files (see app/api/payment/upload-proof/route.ts and
+# app/api/admin/proof/[orderId]/route.ts). Keep the directory tracked via
+# .gitkeep only.
+/private-uploads/*
+!/private-uploads/.gitkeep
+
+# Local build/package artifacts
+*.tgz
+*.zip
+*.tsbuildinfo
