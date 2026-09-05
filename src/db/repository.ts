@@ -34,6 +34,22 @@ export interface Order {
   reviewed_at: string | null;
 }
 
+export interface PaymentProof {
+  order_id: string;
+  filename: string;
+  mime_type: string;
+  byte_size: number;
+  data_base64: string;
+  created_at: string;
+}
+
+export interface PaymentProofInput {
+  filename: string;
+  mimeType: string;
+  byteSize: number;
+  dataBase64: string;
+}
+
 export interface Subscription {
   id: string;
   user_id: string;
@@ -103,16 +119,44 @@ export async function getOrder(orderId: string): Promise<Order | undefined> {
   return db.get<Order>("SELECT * FROM orders WHERE id = ?", [orderId]);
 }
 
-export async function attachProof(orderId: string, filePath: string): Promise<Order> {
+export async function attachProof(orderId: string, proof: PaymentProofInput): Promise<Order> {
   const db = await ensureMigrated();
   const now = new Date().toISOString();
+
+  await db.run(
+    `INSERT INTO payment_proofs (order_id, filename, mime_type, byte_size, data_base64, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(order_id) DO UPDATE SET
+       filename = excluded.filename,
+       mime_type = excluded.mime_type,
+       byte_size = excluded.byte_size,
+       data_base64 = excluded.data_base64,
+       created_at = excluded.created_at`,
+    [
+      orderId,
+      proof.filename,
+      proof.mimeType,
+      proof.byteSize,
+      proof.dataBase64,
+      now,
+    ]
+  );
+
   await db.run(
     `UPDATE orders SET proof_file_path = ?, status = 'PENDING_REVIEW', updated_at = ? WHERE id = ?`,
-    [filePath, now, orderId]
+    [proof.filename, now, orderId]
   );
   const updated = await getOrder(orderId);
   if (!updated) throw new Error("Order not found after update");
   return updated;
+}
+
+export async function getPaymentProof(orderId: string): Promise<PaymentProof | undefined> {
+  const db = await ensureMigrated();
+  return db.get<PaymentProof>(
+    "SELECT order_id, filename, mime_type, byte_size, data_base64, created_at FROM payment_proofs WHERE order_id = ?",
+    [orderId]
+  );
 }
 
 export async function reviewOrder(

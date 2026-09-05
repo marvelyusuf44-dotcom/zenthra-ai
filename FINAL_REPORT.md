@@ -1,10 +1,16 @@
 # Zenthra V1 — Final Report
 
-Status: **implementation complete for the scope below; NOT verified via a real
-`npm install` / `npm run build` / runtime test**, because this environment has
-no network access (npm registry returns 403 Forbidden on every request,
-confirmed repeatedly across sessions — see "Build & test status"). Everything
-below is reported honestly against that constraint.
+Status: **implementation complete for the scope below and verified in the
+Replit development environment**. The production database still receives
+schema changes through Publish, not through a runtime migration.
+
+### Verification update
+
+The durable payment-proof flow was exercised against the Replit development
+Postgres database: the schema initialized, a multipart proof upload returned
+`PENDING_REVIEW`, the proof bytes were present in `payment_proofs`, and the
+authenticated admin proof route rejected an unauthenticated request with
+`401`. The temporary test order and proof were deleted afterward.
 
 ---
 
@@ -21,18 +27,16 @@ behavior safe/correct:
    *any* request when the secret isn't configured, and `401` on a mismatched
    secret. See `app/api/telegram/webhook/route.ts`.
 
-2. **Payment proof is no longer publicly accessible.** Proof files
-   previously landed in `public/uploads/` (web-servable by Next.js to
-   anyone with the URL). They now write to `private-uploads/` — a directory
-   outside `public/` that Next.js never serves statically — and the file
-   bytes are sent directly to the Telegram admin chat via multipart upload
-   (`sendPhoto`/`sendDocument`), so no URL is needed at all for the primary
-   flow. A new authenticated fallback route, `GET
-   /api/admin/proof/[orderId]` (requires `x-admin-secret`), covers the case
-   where Telegram isn't configured. `PUBLIC_BASE_URL` (previously used to
-   build a public proof link) was removed as it's no longer needed. See
-   `app/api/payment/upload-proof/route.ts`, `src/telegram/adminBot.ts`,
-   `app/api/admin/proof/[orderId]/route.ts`.
+2. **Payment proof is no longer publicly accessible or filesystem-dependent.**
+   New proof bytes are stored in the private `payment_proofs` database table
+   and sent directly to the Telegram admin chat via multipart upload
+   (`sendPhoto`/`sendDocument`). An authenticated route,
+   `GET /api/admin/proof/[orderId]` (requires `x-admin-secret`), reads the
+   durable database copy. It retains a private-uploads fallback for legacy
+   orders created before database-backed proof storage. `PUBLIC_BASE_URL`
+   (previously used to build a public proof link) was removed. See
+   `app/api/payment/upload-proof/route.ts`, `src/db/repository.ts`,
+   `src/telegram/adminBot.ts`, and `app/api/admin/proof/[orderId]/route.ts`.
 
 3. **Persistence is now Postgres-compatible.** `src/db/repository.ts` no
    longer talks to `better-sqlite3` directly — it's written against a new
@@ -356,26 +360,17 @@ silently baked in.
 
 ## 7. Known limitations to verify before production
 
-1. **Postgres adapter is unverified against a real database.** `DATABASE_URL`
-   now selects a `PostgresAdapter` (`src/db/client.ts`, via the `pg`
-   package) instead of the previous "SQLite only" state — this was blocker
-   #3. However, this sandbox has no network access, so the adapter has
-   **never been run against a real Postgres instance**: no connection was
-   opened, no query executed, no migration verified. It's written against
-   `pg`'s standard documented API and reuses the exact schema already
-   proven via SQLite (see §0.3 for why the schema is backend-agnostic), but
-   treat it as "should work, unverified" until tested against a real
-   `DATABASE_URL` (e.g. a free-tier Neon/Supabase instance). SQLite remains
-   the zero-config default and is unaffected by this change.
-2. **Payment proof files are no longer public** (blocker #2, fixed this
-   revision) — they live in `private-uploads/`, outside `public/`, and are
-   only reachable via the authenticated `GET /api/admin/proof/[orderId]` or
-   by Telegram receiving them directly. The remaining caveat is the same
-   class as before: on Vercel's serverless runtime, `private-uploads/` is
-   not persistently writable across deployments/instances (same as the old
-   `public/uploads/` note). Object storage (e.g. S3-compatible) is the real
-   production fix for file persistence; not implemented in V1. This is
-   independent of the *access* fix (private vs. public), which is done.
+1. **Production Postgres still needs a Publish step.** The Postgres adapter and
+   durable `payment_proofs` write/read path were exercised against the Replit
+   development database. When publishing, let Replit apply the new
+   `payment_proofs` table to the production database through its Publish schema
+   diff. Do not run production DDL from the app or a manual script.
+2. **Production persistence requires Postgres.** New payment proofs are
+   stored in the `payment_proofs` database table, so they persist across
+   deployments when `DATABASE_URL` points to a persistent PostgreSQL database.
+   The SQLite fallback remains useful for local/Replit demos but is not
+   suitable for serverless production persistence. Legacy proofs that only
+   exist on private disk remain subject to the lifecycle of that host.
 3. **No automated tests were written** (unit/integration) — given the
    network constraints of this session, priority was placed on a correct,
    inspectable implementation plus static checking. Recommend adding tests

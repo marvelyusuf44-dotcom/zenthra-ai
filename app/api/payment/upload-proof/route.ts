@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import path from "path";
-import fs from "fs/promises";
 import { attachProof, getOrder, getPlan } from "@/src/db/repository";
 import { notifyAdminNewPaymentProof } from "@/src/telegram/adminBot";
 import { logger } from "@/src/utils/logger";
@@ -15,26 +13,20 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "applica
  * POST /api/payment/upload-proof
  * multipart/form-data: { orderId: string, file: File }
  *
- * Stores the proof under `private-uploads/<orderId>-<uuid>.<ext>` — a
- * directory OUTSIDE `public/`, so Next.js never serves it as a static file
- * and there is no public URL for a payment proof, ever (blocker fix: proof
- * documents are financial/PII and must be admin-only). The file bytes are
- * also sent directly to the Telegram admin chat via multipart upload (see
- * src/telegram/adminBot.ts) so the admin can review it without needing any
- * URL at all. As a fallback (e.g. Telegram not configured), an
- * authenticated admin can still fetch it via
- * GET /api/admin/proof/[orderId] (x-admin-secret header required).
+ * Stores proof bytes in the durable `payment_proofs` database table, so they
+ * survive restarts, deployments and multiple server instances. The file is
+ * never placed under `public/` and has no public URL. The bytes are also sent
+ * directly to Telegram via multipart upload so the admin can review them
+ * immediately. An authenticated admin can fetch the durable copy later via
+ * GET /api/admin/proof/[orderId].
  *
  * The database write happens first and is authoritative; the Telegram
- * notification is best-effort — if it fails, the order still sits
- * correctly in PENDING_REVIEW and can be approved via the authenticated
- * admin API.
+ * notification is best-effort — if it fails, the order still sits correctly
+ * in PENDING_REVIEW and can be approved via the authenticated admin API.
  *
- * DEPLOYMENT NOTE: writing to a local directory works on Replit/traditional
- * hosts. On Vercel's serverless runtime this directory is not persistently
- * writable across deployments/instances — same class of limitation as
- * src/db/client.ts's SQLite note. Object storage (e.g. S3-compatible) is
- * the production fix; not implemented in V1. Documented in FINAL_REPORT.md.
+ * The maximum proof size is intentionally capped at 5MB so the portable
+ * database representation remains bounded. For much larger documents, move
+ * this repository contract to private object storage in a future version.
  */
 export async function POST(req: NextRequest) {
   let form: FormData;
@@ -87,23 +79,30 @@ export async function POST(req: NextRequest) {
   // a path separator/traversal sequence, even though a real orderId is
   // always a server-generated UUID.
   const safeOrderId = orderId.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 100) || "order";
-  const ext = extensionFor(file.type);
-  const filename = `${safeOrderId}-${randomUUID()}${ext}`;
-  const uploadDir = path.join(process.cwd(), "private-uploads");
+  const filename = `${safeOrderId}-${randomUUID()}${extensionFor(file.type)}`;
 
   let bytes: Buffer;
   try {
-    await fs.mkdir(uploadDir, { recursive: true });
     bytes = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(path.join(uploadDir, filename), bytes);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error("upload_proof.write_failed", { error: msg, orderId });
-    return NextResponse.json({ ok: false, error: `Failed to store file: ${msg}` }, { status: 500 });
+    logger.error("upload_proof.read_failed", { error: msg, orderId });
+    return NextResponse.json({ ok: false, error: `Failed to read file: ${msg}` }, { status: 400 });
   }
 
-  // Store only the bare filename — never a public URL, since none exists.
-  const updatedOrder = await attachProof(orderId, filename);
+  let updatedOrder: Awaited<ReturnType<typeof attachProof>>;
+  try {
+    updatedOrder = await attachProof(orderId, {
+      filename,
+      mimeType: file.type,
+      byteSize: bytes.byteLength,
+      dataBase64: bytes.toString("base64"),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("upload_proof.database_write_failed", { error: msg, orderId });
+    return NextResponse.json({ ok: false, error: "Failed to store payment proof" }, { status: 500 });
+  }
 
   const notifyResult = await notifyAdminNewPaymentProof(updatedOrder, plan, {
     buffer: bytes,

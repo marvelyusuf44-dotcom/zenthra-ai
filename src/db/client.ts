@@ -175,6 +175,16 @@ const SCHEMA_SQL = `
     FOREIGN KEY (plan_id) REFERENCES plans(id)
   );
 
+  CREATE TABLE IF NOT EXISTS payment_proofs (
+    order_id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    data_base64 TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+  );
+
   CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -198,6 +208,7 @@ const SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+  CREATE INDEX IF NOT EXISTS idx_payment_proofs_created ON payment_proofs(created_at);
   CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
 `;
 

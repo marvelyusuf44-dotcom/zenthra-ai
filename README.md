@@ -34,6 +34,11 @@ orchestrates and explains — it never invents prices, scores, or risk levels.
 
 See `FINAL_REPORT.md` for the SQLite-on-Vercel persistence caveat.
 
+Payment proof bytes are stored in the durable `payment_proofs` database table
+and are only served through the authenticated admin proof route. Legacy files
+from older versions can still be read from `private-uploads/` when present.
+For production, configure `DATABASE_URL` to a persistent PostgreSQL database.
+
 ## Stack
 Next.js 14 (App Router) + TypeScript + Tailwind. Replit → GitHub → Vercel → `zenthra.web.id`.
 
@@ -42,11 +47,26 @@ Operational target: Rp0 MVP using free/public data sources where appropriate.
 ### AI provider
 V1 uses Google Gemini Developer API with `gemini-2.5-flash` as the default AI model. See `docs/AI_API_CONTRACT.md`.
 
-## Getting started (on a machine with internet access)
+## Getting started
+
+### Replit
+
+The Replit workflow runs the production server on `0.0.0.0:5000`:
+
+```bash
+npm run build
+npm run start -- --hostname 0.0.0.0 --port 5000
+```
+
+Open `/` for the public site, `/ai` for the intelligence workspace, and
+`/api/health` to confirm the server is live.
+
+### Local development (on a machine with internet access)
+
 ```bash
 npm install
 cp .env.example .env.local   # fill in the values you need
-npm run dev
+npm run dev -- --hostname 0.0.0.0 --port 5000
 ```
 
 Then verify:

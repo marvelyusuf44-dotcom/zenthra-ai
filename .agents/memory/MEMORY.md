@@ -1,0 +1,1 @@
+- [Replit workflow port detection](workflow-port-forwarding.md) — a healthy Next server on port 5000 may be killed by waitForPort detection; omit the wait check when logs show Ready.

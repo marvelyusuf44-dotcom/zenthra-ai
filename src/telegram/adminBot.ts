@@ -17,12 +17,10 @@ import type { Order, Plan } from "@/src/db/repository";
  * Telegram is a convenience layer, not a dependency the system requires to
  * function correctly.
  *
- * PRIVACY NOTE (blocker fix): proof files are payment documents and must
- * never be reachable via a public URL. This module uploads the file bytes
- * directly to Telegram's API (sendPhoto/sendDocument), so the only copies
- * that ever exist are: (a) on local/private disk storage — see
- * app/api/payment/upload-proof/route.ts, stored outside public/ — and (b)
- * inside the admin's private Telegram chat. Neither is web-accessible
+ * PRIVACY NOTE: proof files are payment documents and must never be reachable
+ * via a public URL. This module uploads the file bytes directly to Telegram's
+ * API (sendPhoto/sendDocument), while the authoritative copy is stored in the
+ * private `payment_proofs` database table. Neither copy is web-accessible
  * without authentication.
  */
 
