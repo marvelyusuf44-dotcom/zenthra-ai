@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthorizedAdmin } from "@/src/utils/adminAuth";
 import { listOrdersByStatus, reviewOrder } from "@/src/db/repository";
+import type { Order } from "@/src/db/repository";
 import { logger } from "@/src/utils/logger";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +20,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const status = (req.nextUrl.searchParams.get("status") || "PENDING_REVIEW") as any;
-  const validStatuses = ["PENDING_PROOF", "PENDING_REVIEW", "APPROVED", "REJECTED"];
-  if (!validStatuses.includes(status)) {
-    return NextResponse.json({ ok: false, error: `Invalid status: ${status}` }, { status: 400 });
+  const requestedStatus = req.nextUrl.searchParams.get("status") || "PENDING_REVIEW";
+  const validStatuses: Order["status"][] = [
+    "PENDING_PROOF",
+    "PENDING_REVIEW",
+    "APPROVED",
+    "REJECTED",
+  ];
+  if (!validStatuses.includes(requestedStatus as Order["status"])) {
+    return NextResponse.json(
+      { ok: false, error: `Invalid status: ${requestedStatus}` },
+      { status: 400 }
+    );
   }
+  const status = requestedStatus as Order["status"];
 
   try {
     const orders = await listOrdersByStatus(status);

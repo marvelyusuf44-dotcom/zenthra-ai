@@ -1,5 +1,12 @@
 import { V1_UNIVERSE } from "@/src/types";
-import type { CandidateResult, FuturesScanResult, EvidenceItem } from "@/src/types";
+import type {
+  CandidateResult,
+  FuturesScanResult,
+  EvidenceItem,
+  MarketStructureData,
+  ToolEnvelope,
+  VolumeAnalysisData,
+} from "@/src/types";
 
 import { marketTickerBatch } from "@/src/tools/marketTicker";
 import { ohlcv } from "@/src/tools/ohlcv";
@@ -78,18 +85,32 @@ export async function runFuturesScan(
           marketContext(symbol),
         ]);
 
-      const structureEnv = candlesEnv.ok && candlesEnv.data
-        ? marketStructure(symbol, candlesEnv.data, CANDIDATE_TIMEFRAME)
-        : { ok: false, source: "derived-from-ohlcv", timestamp, data: null, error: candlesEnv.error };
+      const structureEnv: ToolEnvelope<MarketStructureData> =
+        candlesEnv.ok && candlesEnv.data
+          ? marketStructure(symbol, candlesEnv.data, CANDIDATE_TIMEFRAME)
+          : {
+              ok: false,
+              source: "derived-from-ohlcv",
+              timestamp,
+              data: null,
+              error: candlesEnv.error,
+            };
 
-      const volumeEnv = candlesEnv.ok && candlesEnv.data
-        ? volumeAnalysis(symbol, candlesEnv.data)
-        : { ok: false, source: "derived-from-ohlcv", timestamp, data: null, error: candlesEnv.error };
+      const volumeEnv: ToolEnvelope<VolumeAnalysisData> =
+        candlesEnv.ok && candlesEnv.data
+          ? volumeAnalysis(symbol, candlesEnv.data)
+          : {
+              ok: false,
+              source: "derived-from-ohlcv",
+              timestamp,
+              data: null,
+              error: candlesEnv.error,
+            };
 
       // CONFLUENCE SCORE
       const confluence = computeConfluenceScore({
-        marketStructure: structureEnv as any,
-        volumeAnalysis: volumeEnv as any,
+        marketStructure: structureEnv,
+        volumeAnalysis: volumeEnv,
         openInterest: oiEnv,
         openInterestHistory: oiHistEnv,
         fundingRate: fundingEnv,
@@ -101,7 +122,7 @@ export async function runFuturesScan(
 
       // CROSS-CHECK / CONFLICT DETECTOR
       const conflicts = detectConflicts({
-        marketStructure: structureEnv as any,
+        marketStructure: structureEnv,
         openInterestHistory: oiHistEnv,
         fundingRate: fundingEnv,
         priceChangePercent24h: tickerEnv.data.priceChangePercent,
@@ -109,20 +130,28 @@ export async function runFuturesScan(
       const adjustedScore = applyConflictPenalty(confluence.totalScore, conflicts);
 
       // LONG / SHORT / NO TRADE
-      const trend = structureEnv.ok ? (structureEnv.data as any)?.trend : undefined;
+      const trend = structureEnv.ok ? structureEnv.data?.trend : undefined;
       const direction = decideDirection(adjustedScore, trend);
       const classification =
         direction === "NO_TRADE" ? "NO_TRADE" : confluence.classification;
 
       // SETUP (risk engine) — only for LONG/SHORT.
-      const risk = computeRiskLevels(direction, tickerEnv.data.lastPrice, structureEnv as any);
+      const risk = computeRiskLevels(direction, tickerEnv.data.lastPrice, structureEnv);
 
       // EVIDENCE
       const evidence: EvidenceItem[] = [
         toEvidenceItem("market_ticker", tickerEnv, (d) => `Last ${d.lastPrice}, 24h ${d.priceChangePercent.toFixed(2)}%`),
         toEvidenceItem("ohlcv", candlesEnv, (d) => `${d.length} candles on ${CANDIDATE_TIMEFRAME}`),
-        toEvidenceItem("market_structure", structureEnv as any, (d: any) => `Trend: ${d.trend}, ATR%: ${d.volatilityPercent?.toFixed(2) ?? "n/a"}`),
-        toEvidenceItem("volume_analysis", volumeEnv as any, (d: any) => `Relative volume ${d.relativeVolume.toFixed(2)}x`),
+        toEvidenceItem(
+          "market_structure",
+          structureEnv,
+          (d) => `Trend: ${d.trend}, ATR%: ${d.volatilityPercent?.toFixed(2) ?? "n/a"}`
+        ),
+        toEvidenceItem(
+          "volume_analysis",
+          volumeEnv,
+          (d) => `Relative volume ${d.relativeVolume.toFixed(2)}x`
+        ),
         toEvidenceItem("open_interest", oiEnv, (d) => `OI ${d.openInterest.toLocaleString()}`),
         toEvidenceItem("open_interest_history", oiHistEnv, (d) => `Trend: ${d.trend} (${d.changePercent?.toFixed(1) ?? "n/a"}%)`),
         toEvidenceItem("funding_rate", fundingEnv, (d) => `${(d.lastFundingRate * 100).toFixed(4)}%`),

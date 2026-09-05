@@ -27,6 +27,8 @@ export async function onchainActivity(
   asset: string,
   chain: string
 ): Promise<ToolEnvelope<OnchainActivityData>> {
+  void asset;
+  void chain;
   return notImplemented(
     SOURCE,
     "No free, reliable aggregated on-chain activity source is wired for V1. Requires an indexer (e.g. paid) in a future version."

@@ -1,6 +1,5 @@
 import type {
   ConflictFlag,
-  ConfluenceComponentScore,
   MarketStructureData,
   OpenInterestHistoryData,
   FundingRateData,

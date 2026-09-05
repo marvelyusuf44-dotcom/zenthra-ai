@@ -22,6 +22,8 @@ export async function liquidationData(
   symbol: string,
   timeframe: string = "1h"
 ): Promise<ToolEnvelope<LiquidationData>> {
+  void symbol;
+  void timeframe;
   return notImplemented(
     SOURCE,
     "No free public aggregate liquidation feed is available for V1 (CoinGlass is paid and explicitly excluded)."

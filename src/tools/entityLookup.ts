@@ -18,6 +18,7 @@ const SOURCE = "unavailable-v1";
 export async function entityLookup(
   address: string
 ): Promise<ToolEnvelope<EntityLookupData>> {
+  void address;
   return notImplemented(
     SOURCE,
     "No entity/label database is available in V1. Always show the raw address."

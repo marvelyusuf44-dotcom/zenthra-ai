@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   title: "Zenthra — Intelligence for the On-Chain World",
   description:
     "Zenthra is an AI agent for on-chain and futures market intelligence. Ask a question. Zenthra does the research.",
+  keywords: [
+    "on-chain intelligence",
+    "crypto research",
+    "futures intelligence",
+    "market analysis",
+  ],
+  applicationName: "Zenthra",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -8,11 +8,32 @@
 
 body {
   background-color: #05070a;
+  min-width: 320px;
 }
 
 ::selection {
   background-color: #2563eb;
   color: #f5f7fa;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.zenthra-grid {
+  background-image:
+    linear-gradient(rgba(32, 39, 49, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 39, 49, 0.35) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 88%);
+}
+
+.zenthra-glow {
+  box-shadow: 0 0 80px rgba(37, 99, 235, 0.13);
+}
+
+.zenthra-panel {
+  background: linear-gradient(135deg, rgba(17, 22, 29, 0.96), rgba(8, 12, 18, 0.96));
 }
 
 .zenthra-scroll::-webkit-scrollbar {

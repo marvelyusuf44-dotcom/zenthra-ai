@@ -19,6 +19,9 @@ export async function walletBehavior(
   asset: string,
   timeframe: string
 ): Promise<ToolEnvelope<WalletBehaviorData>> {
+  void wallet;
+  void asset;
+  void timeframe;
   return notImplemented(
     SOURCE,
     "Wallet behavior analysis is not available in V1 (depends on wallet_discovery, which is not implemented)."

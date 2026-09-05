@@ -23,6 +23,8 @@ export async function walletDiscovery(
   asset: string,
   criteria: string
 ): Promise<ToolEnvelope<WalletDiscoveryData>> {
+  void asset;
+  void criteria;
   return notImplemented(
     SOURCE,
     "Wallet/entity discovery requires a labeled on-chain index not available for free in V1."

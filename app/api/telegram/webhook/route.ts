@@ -5,6 +5,15 @@ import { logger } from "@/src/utils/logger";
 
 export const dynamic = "force-dynamic";
 
+interface TelegramUpdate {
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: { username?: string; first_name?: string; id?: number };
+    message?: { chat?: { id?: number }; message_id?: number };
+  };
+}
+
 /**
  * POST /api/telegram/webhook
  *
@@ -45,9 +54,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid webhook secret" }, { status: 401 });
   }
 
-  let update: any;
+  let update: TelegramUpdate;
   try {
-    update = await req.json();
+    update = (await req.json()) as TelegramUpdate;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
